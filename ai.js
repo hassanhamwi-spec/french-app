@@ -81,20 +81,27 @@
   function callOpenAIStyle(url, key, model, img, extraHeaders, jsonMode) {
     var h = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
     Object.keys(extraHeaders || {}).forEach(function (k) { h[k] = extraHeaders[k]; });
-    var body = {
-      model: model, temperature: 0.2,
-      messages: [{ role: 'user', content: [{ type: 'text', text: PROMPT }, { type: 'image_url', image_url: { url: img } }] }]
-    };
-    if (jsonMode) body.response_format = { type: 'json_object' };
-    return fetch(url, { method: 'POST', headers: h, body: JSON.stringify(body) }).then(function (r) {
-      return r.text().then(function (t) {
-        if (!r.ok) throw httpErr(r, t);
-        var j = JSON.parse(t);
-        var m = j.choices && j.choices[0] && j.choices[0].message;
-        if (!m || !m.content) throw new Error('empty');
-        return typeof m.content === 'string' ? m.content : m.content.map(function (x) { return x.text || ''; }).join('');
+    function once(useJson) {
+      var body = {
+        model: model, temperature: 0.2,
+        messages: [{ role: 'user', content: [{ type: 'text', text: PROMPT }, { type: 'image_url', image_url: { url: img } }] }]
+      };
+      if (useJson) body.response_format = { type: 'json_object' };
+      return fetch(url, { method: 'POST', headers: h, body: JSON.stringify(body) }).then(function (r) {
+        return r.text().then(function (t) {
+          if (!r.ok) {
+            // some models/providers refuse JSON mode: try once more without it
+            if (useJson && r.status === 400 && /response_format|json/i.test(t)) return once(false);
+            throw httpErr(r, t);
+          }
+          var j = JSON.parse(t);
+          var m = j.choices && j.choices[0] && j.choices[0].message;
+          if (!m || !m.content) throw new Error('empty');
+          return typeof m.content === 'string' ? m.content : m.content.map(function (x) { return x.text || ''; }).join('');
+        });
       });
-    });
+    }
+    return once(jsonMode);
   }
   var CALLERS = {
     gemini: function (key, model, img) { return callGemini(key, model, img); },
@@ -237,8 +244,11 @@
     var S = window.Store.settings();
     var key = S.keys[p];
     if (!key) return Promise.reject(new Error('no key'));
-    var tiny = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-    var oldPrompt = PROMPT; PROMPT = 'Reply with {"ok":true}';
+    var tiny = (function () {
+      try { var c = document.createElement('canvas'); c.width = 96; c.height = 96; var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 96, 96); g.fillStyle = '#000'; g.font = '40px sans-serif'; g.fillText('Ab', 16, 62); return c.toDataURL('image/png'); }
+      catch (e) { return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='; }
+    })();
+    var oldPrompt = PROMPT; PROMPT = 'Reply with a tiny JSON object: {"ok":true}';
     var busy = false, lastErr = null;
     var chain = modelsFor(p, key).then(function (models) {
       var c = Promise.resolve(null);

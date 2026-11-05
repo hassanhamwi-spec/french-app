@@ -131,17 +131,25 @@
     var o = { v: 1, keys: s.keys, models: s.models };
     return 'FRSETUP1:' + btoa(unescape(encodeURIComponent(JSON.stringify(o))));
   };
+  // returns {ok:true} or {ok:false, why:'...'} ; tolerant of what chat apps do to pasted text
   Store.importSetup = function (code) {
-    code = String(code || '').trim();
-    if (code.indexOf('FRSETUP1:') !== 0) return false;
+    var raw = String(code || '');
+    var i = raw.indexOf('FRSETUP1:');
+    if (i < 0) return { ok: false, why: 'ما لقيت بداية الرمز FRSETUP1 — تأكّدي إنك نسختي الرمز كله.' };
+    // keep only base64 characters (drops spaces, line breaks, invisible right-to-left marks, quotes...)
+    var b64 = raw.slice(i + 9).replace(/-/g, '+').replace(/_/g, '/').replace(/[^A-Za-z0-9+\/]/g, '');
+    while (b64.length % 4) b64 += '=';
     try {
-      var o = JSON.parse(decodeURIComponent(escape(atob(code.slice(9)))));
+      var o = JSON.parse(decodeURIComponent(escape(atob(b64))));
+      if (!o || typeof o !== 'object' || !o.keys) return { ok: false, why: 'الرمز مو كامل (' + b64.length + ' حرف). انسخيه من أوله لآخره.' };
       var s = Store.settings();
       s.keys = o.keys || {};
       s.models = o.models || {};
       Store.saveSettings(s);
-      return true;
-    } catch (e) { return false; }
+      return { ok: true, n: Object.keys(s.keys).filter(function (k) { return s.keys[k]; }).length };
+    } catch (e) {
+      return { ok: false, why: 'الرمز ناقص أو مقصوص (طوله ' + b64.length + ' حرف). انسخيه كامل وجرّبي تاني.' };
+    }
   };
 
   window.Store = Store;

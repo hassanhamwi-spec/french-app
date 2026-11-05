@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2.5';
+  var APP_VERSION = '2.6';
   var BUILTIN = window.APP_DATA.lessons;
   var Store = window.Store, Voice = window.Voice, Pron = window.Pron, AI = window.AI;
   var app = document.getElementById('app');
@@ -769,7 +769,9 @@
     }
     if (t.closest('#expcode')) { $('codebox').value = Store.exportSetup(); return; }
     if (t.closest('#impcode')) {
-      if (Store.importSetup($('codebox').value)) { toast('تم الاستيراد ✅'); route(); } else toast('الرمز مو صحيح');
+      var ir = Store.importSetup($('codebox').value);
+      if (ir.ok) { toast('تم الاستيراد ✅ (' + ir.n + ' مفاتيح)'); route(); }
+      else { var cb = $('codebox'); cb.insertAdjacentHTML('afterend', '<div class="note bad" id="imperr"></div>'); var ie = document.querySelectorAll('#imperr'); for (var q = 0; q < ie.length - 1; q++) ie[q].remove(); $('imperr').textContent = ir.why; }
       return;
     }
     if (t.closest('#getpack')) {

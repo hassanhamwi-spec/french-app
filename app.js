@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2.1';
+  var APP_VERSION = '2.2';
   var BUILTIN = window.APP_DATA.lessons;
   var Store = window.Store, Voice = window.Voice, Pron = window.Pron, AI = window.AI;
   var app = document.getElementById('app');
@@ -783,10 +783,34 @@
   // photos taken without internet become lessons by themselves
   setTimeout(function () { processQueue(true).then(function (n) { if (n && (location.hash === '' || location.hash === '#/')) route(); }); }, 1500);
 
-  /* ---------- offline support ---------- */
+  /* ---------- offline support + safe updates ---------- */
+  var waitingSW = null;
+  function showUpdate() {
+    if ($('updbar')) return;
+    var d = document.createElement('div');
+    d.id = 'updbar'; d.className = 'updbar';
+    d.innerHTML = '<span>🔄 في نسخة جديدة من التطبيق</span><button id="updnow">حدّثي هلأ</button>';
+    document.body.appendChild(d);
+  }
+  document.addEventListener('click', function (e) {
+    if (e.target && e.target.id === 'updnow' && waitingSW) { waitingSW.postMessage('SKIP_WAITING'); e.target.textContent = '...'; }
+  });
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    var reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (reloading || !waitingSW) return;   // first install is not an update
+      reloading = true; location.reload();
+    });
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js').catch(function () { /* silent */ });
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
+        function watch(r) { if (r.waiting && navigator.serviceWorker.controller) { waitingSW = r.waiting; showUpdate(); } }
+        watch(reg);
+        reg.addEventListener('updatefound', function () {
+          var nw = reg.installing;
+          if (nw) nw.addEventListener('statechange', function () { if (nw.state === 'installed' && navigator.serviceWorker.controller) { waitingSW = nw; showUpdate(); } });
+        });
+        reg.update().catch(function () { /* offline */ });
+      }).catch(function () { /* silent */ });
       if (navigator.storage && navigator.storage.persist) { navigator.storage.persist().catch(function () {}); }
     });
   }

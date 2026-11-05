@@ -168,3 +168,6 @@ a.spk { display: flex; align-items: center; justify-content: center; }
 .bar { background: #ffe0d2; }
 [hidden] { display: none !important; }
 .wrow .spk-mini, .ex .spk-mini { flex: 0 0 44px; width: 44px; }
+
+.updbar { position: fixed; top: 0; right: 0; left: 0; z-index: 30; background: #2e7d32; color: #fff; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 700; }
+.updbar button { min-height: 44px; border: 0; border-radius: 12px; padding: 0 16px; font-size: 17px; font-weight: 700; background: #fff; color: #2e7d32; cursor: pointer; }

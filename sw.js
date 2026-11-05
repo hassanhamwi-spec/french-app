@@ -1,7 +1,7 @@
 // Offline-first service worker. No offline page, no banners: the app is always served from the saved copy.
-// To release a new version, change CACHE (e.g. fr-app-v3). The new version starts only after the app is closed,
+// To release a new version, change CACHE (e.g. fr-app-v4). The new version starts only after the app is closed,
 // so a lesson is never interrupted.
-var CACHE = 'fr-app-v3';
+var CACHE = 'fr-app-v4';
 var FILES = [
   './',
   './index.html',
@@ -19,6 +19,10 @@ var FILES = [
 
 self.addEventListener('install', function (event) {
   event.waitUntil(caches.open(CACHE).then(function (cache) { return cache.addAll(FILES); }));
+});
+
+self.addEventListener('message', function (event) {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();   // only when the user taps «update now»
 });
 
 self.addEventListener('activate', function (event) {

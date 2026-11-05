@@ -71,7 +71,7 @@
   /* ---- settings (API keys stay on this phone) ---- */
   var DEFAULT_MODELS = {
     gemini: ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash'],
-    groq: ['meta-llama/llama-4-scout-17b-16e-instruct'],
+    groq: ['qwen/qwen3.8-27b'],
     mistral: ['mistral-small-latest', 'pixtral-12b-latest'],
     openrouter: ['openrouter/free']
   };

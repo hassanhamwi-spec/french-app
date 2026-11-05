@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2.2';
+  var APP_VERSION = '2.3';
   var BUILTIN = window.APP_DATA.lessons;
   var Store = window.Store, Voice = window.Voice, Pron = window.Pron, AI = window.AI;
   var app = document.getElementById('app');

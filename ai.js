@@ -153,6 +153,25 @@
     };
   }
 
+
+  /* Free providers rename models often. For Groq we ask the account which models exist and pick vision-capable ones. */
+  var discovered = {};
+  function modelsFor(p, key) {
+    var S = window.Store.settings();
+    var base = (S.models[p] && S.models[p].length) ? S.models[p] : window.Store.DEFAULT_MODELS[p];
+    if (p !== 'groq') return Promise.resolve(base);
+    if (discovered[p]) return Promise.resolve(discovered[p].concat(base.filter(function (m) { return discovered[p].indexOf(m) < 0; })));
+    return withTimeout(fetch('https://api.groq.com/openai/v1/models', { headers: { 'Authorization': 'Bearer ' + key } }).then(function (r) {
+      return r.ok ? r.json() : { data: [] };
+    }), 10000).then(function (j) {
+      var ids = (j.data || []).map(function (x) { return x.id; });
+      var pref = ids.filter(function (id) { return /vision|vl|scout|maverick|qwen3|muse/i.test(id) && !/guard|whisper|tts|prompt/i.test(id); });
+      pref.sort(function (a, b) { return (base.indexOf(a) < 0 ? 1 : 0) - (base.indexOf(b) < 0 ? 1 : 0); });
+      discovered[p] = pref.slice(0, 4);
+      return discovered[p].concat(base.filter(function (m) { return discovered[p].indexOf(m) < 0 && ids.indexOf(m) >= 0; }));
+    }).catch(function () { return base; });
+  }
+
   /* ---- the fallback chain ---- */
   // Returns {lesson, provider, tried:[...]} or throws Error with .tried
   AI.lessonFromPhoto = function (imageDataUrl, onStatus) {
@@ -162,19 +181,24 @@
     ORDER.forEach(function (p) {
       var key = S.keys[p];
       if (!key || key.length < 8) return;
-      var models = (S.models[p] && S.models[p].length) ? S.models[p] : window.Store.DEFAULT_MODELS[p];
-      models.forEach(function (model) {
-        chain = chain.then(function (found) {
-          if (found) return found;
-          if (onStatus) onStatus(NAMES[p]);
-          return withTimeout(CALLERS[p](key, model, imageDataUrl), 60000).then(function (text) {
-            return { lesson: sanitize(extractJson(text), NAMES[p]), provider: NAMES[p], model: model };
-          }).catch(function (e) {
-            tried.push(NAMES[p] + ': ' + String(e && e.message || e).slice(0, 120));
-            // rate limit → wait a moment, then move on to the next one
-            if (e && (e.status === 429 || e.status === 503)) return sleep(800).then(function () { return null; });
-            return null;
+      chain = chain.then(function (found) {
+        if (found) return found;
+        return modelsFor(p, key).then(function (models) {
+          var inner = Promise.resolve(null);
+          models.forEach(function (model) {
+            inner = inner.then(function (f2) {
+              if (f2) return f2;
+              if (onStatus) onStatus(NAMES[p]);
+              return withTimeout(CALLERS[p](key, model, imageDataUrl), 60000).then(function (text) {
+                return { lesson: sanitize(extractJson(text), NAMES[p]), provider: NAMES[p], model: model };
+              }).catch(function (e) {
+                tried.push(NAMES[p] + ': ' + String(e && e.message || e).slice(0, 120));
+                if (e && (e.status === 429 || e.status === 503)) return sleep(800).then(function () { return null; });
+                return null;
+              });
+            });
           });
+          return inner;
         });
       });
     });
@@ -213,19 +237,21 @@
     var S = window.Store.settings();
     var key = S.keys[p];
     if (!key) return Promise.reject(new Error('no key'));
-    var models = (S.models[p] && S.models[p].length) ? S.models[p] : window.Store.DEFAULT_MODELS[p];
     var tiny = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
     var oldPrompt = PROMPT; PROMPT = 'Reply with {"ok":true}';
     var busy = false, lastErr = null;
-    var chain = Promise.resolve(null);
-    models.forEach(function (m) {
-      chain = chain.then(function (done) {
-        if (done) return done;
-        return withTimeout(CALLERS[p](key, m, tiny), 30000).then(function () { return 'ok'; }, function (e) {
-          if (e && (e.status === 429 || e.status === 503 || e.message === 'timeout')) busy = true; else lastErr = e;
-          return null;
+    var chain = modelsFor(p, key).then(function (models) {
+      var c = Promise.resolve(null);
+      models.forEach(function (m) {
+        c = c.then(function (done) {
+          if (done) return done;
+          return withTimeout(CALLERS[p](key, m, tiny), 30000).then(function () { return 'ok'; }, function (e) {
+            if (e && (e.status === 429 || e.status === 503 || e.message === 'timeout')) busy = true; else lastErr = e;
+            return null;
+          });
         });
       });
+      return c;
     });
     return chain.then(function (r) {
       PROMPT = oldPrompt;

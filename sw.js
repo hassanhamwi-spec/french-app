@@ -1,7 +1,7 @@
 // Offline-first service worker. No offline page, no banners: the app is always served from the saved copy.
-// To release a new version, change CACHE (e.g. fr-app-v6). The new version starts only after the app is closed,
+// To release a new version, change CACHE (e.g. fr-app-v7). The new version starts only after the app is closed,
 // so a lesson is never interrupted.
-var CACHE = 'fr-app-v6';
+var CACHE = 'fr-app-v7';
 var FILES = [
   './',
   './index.html',
@@ -18,7 +18,15 @@ var FILES = [
 ];
 
 self.addEventListener('install', function (event) {
-  event.waitUntil(caches.open(CACHE).then(function (cache) { return cache.addAll(FILES); }));
+  // 'reload' skips the browser's HTTP cache, so a new version never saves OLD files (GitHub Pages caches files ~10 min)
+  event.waitUntil(caches.open(CACHE).then(function (cache) {
+    return Promise.all(FILES.map(function (f) {
+      return fetch(new Request(f, { cache: 'reload' })).then(function (res) {
+        if (!res.ok) throw new Error('precache ' + f + ' ' + res.status);
+        return cache.put(f, res);
+      });
+    }));
+  }));
 });
 
 self.addEventListener('message', function (event) {

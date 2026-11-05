@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2.4';
+  var APP_VERSION = '2.5';
   var BUILTIN = window.APP_DATA.lessons;
   var Store = window.Store, Voice = window.Voice, Pron = window.Pron, AI = window.AI;
   var app = document.getElementById('app');
@@ -618,6 +618,9 @@
 
     h += '<div class="box"><h3>التقدّم</h3>التقدّم محفوظ على هالموبايل بس (لكل واحد: الأم وعبد الرحمن).' +
       '<br><button class="danger" id="reset">مسح تقدّم ' + (Store.profile() === 'son' ? 'عبد الرحمن' : 'الأم') + '</button></div>';
+    h += '<div class="box"><h3>🔄 تحديث التطبيق</h3>النسخة الحالية: <b>' + APP_VERSION + '</b><div class="note" id="updinfo"></div>' +
+      '<button class="spk" id="forceupd">فحص وتحديث هلأ</button>' +
+      '<div class="note">بيحدّث ملفات التطبيق بس. المفاتيح والتقدّم والصوت المحمّل بتضل محفوظة.</div></div>';
     h += '<div class="note ver">النسخة ' + APP_VERSION + '</div>';
     return h;
   }
@@ -750,6 +753,18 @@
       }).catch(function (er) {
         ks.textContent = '❌ ' + String(er.message || er).slice(0, 120); ks.className = 'kstat bad';
       });
+      return;
+    }
+    if (t.closest('#forceupd')) {
+      var inf = $('updinfo'); inf.textContent = 'عم فحص...';
+      if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) { inf.textContent = 'التحديث بيشتغل بس من الرابط.'; return; }
+      // drop ONLY the app-files cache and the service worker; keys, progress, voice and lessons stay
+      caches.keys().then(function (ks) {
+        return Promise.all(ks.filter(function (k) { return k.indexOf('fr-app-') === 0; }).map(function (k) { return caches.delete(k); }));
+      }).then(function () { return navigator.serviceWorker.getRegistrations(); }).then(function (rs) {
+        return Promise.all(rs.map(function (r) { return r.unregister(); }));
+      }).then(function () { inf.textContent = 'تمام، عم أعيد التحميل...'; setTimeout(function () { location.reload(); }, 600); })
+        .catch(function () { inf.textContent = 'ما زبط، سكّري التبويبات وافتحيه من جديد.'; });
       return;
     }
     if (t.closest('#expcode')) { $('codebox').value = Store.exportSetup(); return; }

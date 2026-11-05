@@ -172,7 +172,7 @@
           }).catch(function (e) {
             tried.push(NAMES[p] + ': ' + String(e && e.message || e).slice(0, 120));
             // rate limit → wait a moment, then move on to the next one
-            if (e && e.status === 429) return sleep(600).then(function () { return null; });
+            if (e && (e.status === 429 || e.status === 503)) return sleep(800).then(function () { return null; });
             return null;
           });
         });
@@ -206,16 +206,33 @@
     });
   };
 
-  /* lets the settings page test a single key quickly */
+  /* lets the settings page test a single key quickly.
+     Resolves 'ok' (works), 'busy' (key is fine, the service is overloaded / out of free quota right now).
+     Rejects when the key itself looks wrong. Tries every model of that provider before giving up. */
   AI.testKey = function (p) {
     var S = window.Store.settings();
     var key = S.keys[p];
     if (!key) return Promise.reject(new Error('no key'));
-    var model = ((S.models[p] && S.models[p][0]) || window.Store.DEFAULT_MODELS[p][0]);
+    var models = (S.models[p] && S.models[p].length) ? S.models[p] : window.Store.DEFAULT_MODELS[p];
     var tiny = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-    var P2 = 'Reply with {"ok":true}';
-    var oldPrompt = PROMPT; PROMPT = P2;
-    return withTimeout(CALLERS[p](key, model, tiny), 30000).then(function () { PROMPT = oldPrompt; return true; }, function (e) { PROMPT = oldPrompt; throw e; });
+    var oldPrompt = PROMPT; PROMPT = 'Reply with {"ok":true}';
+    var busy = false, lastErr = null;
+    var chain = Promise.resolve(null);
+    models.forEach(function (m) {
+      chain = chain.then(function (done) {
+        if (done) return done;
+        return withTimeout(CALLERS[p](key, m, tiny), 30000).then(function () { return 'ok'; }, function (e) {
+          if (e && (e.status === 429 || e.status === 503 || e.message === 'timeout')) busy = true; else lastErr = e;
+          return null;
+        });
+      });
+    });
+    return chain.then(function (r) {
+      PROMPT = oldPrompt;
+      if (r) return r;
+      if (busy) return 'busy';
+      throw lastErr || new Error('failed');
+    });
   };
 
   window.AI = AI;

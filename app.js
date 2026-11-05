@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2.0';
+  var APP_VERSION = '2.1';
   var BUILTIN = window.APP_DATA.lessons;
   var Store = window.Store, Voice = window.Voice, Pron = window.Pron, AI = window.AI;
   var app = document.getElementById('app');
@@ -744,7 +744,10 @@
       var p = c.getAttribute('data-p');
       Store.saveSettings(readKeys());
       var ks = $('ks-' + p); ks.textContent = 'عم فحص...'; ks.className = 'kstat';
-      AI.testKey(p).then(function () { ks.textContent = '✅ شغّال'; ks.className = 'kstat okc'; }).catch(function (er) {
+      AI.testKey(p).then(function (r) {
+        if (r === 'busy') { ks.textContent = '⚠️ المفتاح تمام، بس الخدمة مشغولة هلأ. جرّب بعد شوي.'; ks.className = 'kstat'; }
+        else { ks.textContent = '✅ شغّال'; ks.className = 'kstat okc'; }
+      }).catch(function (er) {
         ks.textContent = '❌ ' + String(er.message || er).slice(0, 120); ks.className = 'kstat bad';
       });
       return;

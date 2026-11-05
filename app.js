@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2.6';
+  var APP_VERSION = '2.7';
   var BUILTIN = window.APP_DATA.lessons;
   var Store = window.Store, Voice = window.Voice, Pron = window.Pron, AI = window.AI;
   var app = document.getElementById('app');
@@ -605,8 +605,10 @@
     h += '<button class="go" id="savekeys">💾 حفظ المفاتيح</button>';
     h += '<details class="keys"><summary>نقل الإعداد لموبايل تاني</summary>' +
       '<div class="note">انسخ الرمز من هون والصقه بنفس الصفحة على موبايل الأم. الرمز فيه مفاتيحك، لا تشاركه مع حدا.</div>' +
-      '<button class="spk" id="expcode">إظهار الرمز</button><textarea id="codebox" dir="ltr" rows="3" placeholder="FRSETUP1:..."></textarea>' +
-      '<button class="spk slow" id="impcode">استيراد رمز</button></details></div>';
+      '<button class="spk" id="expcode">إظهار الرمز</button><div id="codeacts" hidden><div class="btns"><button class="spk" id="copycode">📋 نسخ</button><button class="spk slow" id="sharecode">📤 مشاركة</button></div><div class="note" id="codelen"></div></div>' +
+      '<textarea id="codebox" dir="ltr" rows="5" placeholder="FRSETUP1:..."></textarea>' +
+      '<div class="btns"><button class="spk" id="pastecode">📥 لصق من الحافظة</button><button class="spk slow" id="impcode">استيراد رمز</button></div>' +
+      '</details></div>';
 
     h += '<div class="box"><h3>🎤 فحص النطق</h3>' +
       '<label class="tog"><input type="checkbox" id="stt"' + (S.onlineSTT ? ' checked' : '') + '> استعمال التعرّف الآلي بالإنترنت (بيرسل صوت الولد لـ Google)</label>' +
@@ -767,7 +769,23 @@
         .catch(function () { inf.textContent = 'ما زبط، سكّري التبويبات وافتحيه من جديد.'; });
       return;
     }
-    if (t.closest('#expcode')) { $('codebox').value = Store.exportSetup(); return; }
+    if (t.closest('#expcode')) { var cd = Store.exportSetup(); $('codebox').value = cd; $('codeacts').hidden = false; $('codelen').textContent = 'طول الرمز: ' + cd.length + ' حرف. لازم يوصل نفس الطول للموبايل التاني.'; return; }
+    if (t.closest('#copycode')) {
+      var cc = Store.exportSetup();
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(cc).then(function () { toast('اننسخ الرمز ✅'); }, function () { $('codebox').select(); toast('اضغطي مطوّلاً ← نسخ'); });
+      else { $('codebox').value = cc; $('codebox').select(); toast('اضغطي مطوّلاً ← نسخ'); }
+      return;
+    }
+    if (t.closest('#sharecode')) {
+      var sc = Store.exportSetup();
+      if (navigator.share) navigator.share({ text: sc }).catch(function () {}); else toast('المشاركة مو مدعومة، استعملي «نسخ»');
+      return;
+    }
+    if (t.closest('#pastecode')) {
+      if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(function (txt) { $('codebox').value = txt; toast('انلصق (' + txt.length + ' حرف)'); }, function () { toast('اسمحي بالوصول للحافظة، أو الصقي يدوياً'); });
+      else toast('الصقي يدوياً بالخانة');
+      return;
+    }
     if (t.closest('#impcode')) {
       var ir = Store.importSetup($('codebox').value);
       if (ir.ok) { toast('تم الاستيراد ✅ (' + ir.n + ' مفاتيح)'); route(); }

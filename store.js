@@ -135,9 +135,11 @@
   Store.importSetup = function (code) {
     var raw = String(code || '');
     var i = raw.indexOf('FRSETUP1:');
-    if (i < 0) return { ok: false, why: 'ما لقيت بداية الرمز FRSETUP1 — تأكّدي إنك نسختي الرمز كله.' };
+    // if the beginning was cut off, still try the rest as the code itself
+    var body = (i < 0) ? raw : raw.slice(i + 9);
+    if (i < 0 && raw.replace(/\s/g, '').length < 60) return { ok: false, why: 'اللي انلصق قصير (' + raw.replace(/\s/g, '').length + ' حرف) ومو الرمز. انسخيه من الموبايل الأول بزر «نسخ».' };
     // keep only base64 characters (drops spaces, line breaks, invisible right-to-left marks, quotes...)
-    var b64 = raw.slice(i + 9).replace(/-/g, '+').replace(/_/g, '/').replace(/[^A-Za-z0-9+\/]/g, '');
+    var b64 = body.replace(/-/g, '+').replace(/_/g, '/').replace(/[^A-Za-z0-9+\/]/g, '');
     while (b64.length % 4) b64 += '=';
     try {
       var o = JSON.parse(decodeURIComponent(escape(atob(b64))));
@@ -148,7 +150,7 @@
       Store.saveSettings(s);
       return { ok: true, n: Object.keys(s.keys).filter(function (k) { return s.keys[k]; }).length };
     } catch (e) {
-      return { ok: false, why: 'الرمز ناقص أو مقصوص (طوله ' + b64.length + ' حرف). انسخيه كامل وجرّبي تاني.' };
+      return { ok: false, why: 'الرمز ناقص أو مقصوص (استلمت ' + b64.length + ' حرف). انسخيه بزر «نسخ» من الموبايل الأول وجرّبي تاني.' };
     }
   };
 

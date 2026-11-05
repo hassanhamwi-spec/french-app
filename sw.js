@@ -1,7 +1,7 @@
 // Offline-first service worker. No offline page, no banners: the app is always served from the saved copy.
-// To release a new version, change CACHE (e.g. fr-app-v8). The new version starts only after the app is closed,
+// To release a new version, change CACHE (e.g. fr-app-v9). The new version starts only after the app is closed,
 // so a lesson is never interrupted.
-var CACHE = 'fr-app-v8';
+var CACHE = 'fr-app-v9';
 var FILES = [
   './',
   './index.html',
